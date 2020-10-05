@@ -2,6 +2,7 @@
 import time
 from tqdm import tqdm
 import torch
+from torch import optim
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
@@ -29,6 +30,11 @@ class SimCLRFramework(object):
         self.dataset = dataset
         self.batch_size = batch_size
         self.simclr_network = SimCLRNetwork().to(device)
+        # self.lr = 0.3*self.batch_size/256
+        self.lr = 1e-3
+        self.beta_1 = 0.5
+        self.beta_2 = 0.999
+        self.weight_decay = 1e-6
         self.writer = SummaryWriter(
             "../logs/SIMCLR_%s" %((str(int(time.time())))))
 
@@ -61,10 +67,15 @@ class SimCLRFramework(object):
         Inputs:
             log_interval: number of batch between logs
         """
-        optimizer = lars.LARS(
+        # optimizer = lars.LARS(
+        #     self.simclr_network.parameters(),
+        #     lr=self.lr,
+        #     weight_decay=self.weight_decay)
+        optimizer = optim.Adam(
             self.simclr_network.parameters(),
-            lr=0.3*self.batch_size/256,
-            weight_decay=1e-6)
+            lr=self.lr,
+            betas=[self.beta_1, self.beta_2],
+            weight_decay=self.weight_decay)
         progress_bar = tqdm(
             total=NB_EPOCHS*len(self.dataset),
             desc="SIMCLR training",
@@ -74,6 +85,8 @@ class SimCLRFramework(object):
             self.simclr_network.train()
             print("num epoch: " + str(epoch) +  "/" + str(NB_EPOCHS))
             for batch_id, ((x1, x2), _) in enumerate(self.dataset):
+                optimizer.zero_grad()
+
                 # send to device
                 x1 = x1.to(self.device)
                 x2 = x2.to(self.device)
@@ -88,7 +101,6 @@ class SimCLRFramework(object):
                 # loss
                 loss_pos_pair = self.compute_loss(z1, z2)
 
-                optimizer.zero_grad()
                 loss_pos_pair.backward()
                 optimizer.step()
 

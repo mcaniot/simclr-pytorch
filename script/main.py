@@ -8,7 +8,7 @@ from torch import nn, optim
 import data_augmentation
 from simclr_framework import SimCLRFramework
 
-BATCH_SIZE = 64
+BATCH_SIZE = 256
 
 trainset = datasets.STL10(
     '../data/', download=False, split="unlabeled",
