@@ -1,6 +1,7 @@
 # Basic libraries
 import torch.nn as nn
 import torchvision.models as models
+import torch.nn.functional as F
 
 
 class SimCLRNetwork(nn.Module):
@@ -13,8 +14,9 @@ class SimCLRNetwork(nn.Module):
         """
         super(SimCLRNetwork, self).__init__()
         # base encoder based on resnet50
-        self.base_encoder = models.resnet50(pretrained=False)
-        nb_features = self.base_encoder.fc.out_features
+        self.base_encoder = models.resnet50()
+        nb_features = self.base_encoder.fc.in_features
+        self.base_encoder.fc = nn.Identity()
         # projection head, a two layer MLP
         self.projection_head = nn.Sequential(
             nn.Linear(nb_features, nb_features),
@@ -43,9 +45,11 @@ class SimCLRNetwork(nn.Module):
             z1, z2: space vector of image x1, x2
         """
         # first augmentation
-        h1 = self.base_encoder.forward(x1)
-        z1 = self.projection_head.forward(h1)
+        h1 = self.base_encoder(x1)
+        z1 = self.projection_head(h1)
+        z1_normalized = F.normalize(z1, dim = 1)
         # second augmentation
-        h2 = self.base_encoder.forward(x2)
-        z2 = self.projection_head.forward(h2)
-        return z1, z2
+        h2 = self.base_encoder(x2)
+        z2 = self.projection_head(h2)
+        z2_normalized = F.normalize(z2, dim = 1)
+        return z1_normalized, z2_normalized
