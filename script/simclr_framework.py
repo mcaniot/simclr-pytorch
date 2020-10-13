@@ -37,29 +37,33 @@ class SimCLRFramework(object):
         self.weight_decay = 1e-6
         self.writer = SummaryWriter(
             "../logs/SIMCLR_%s" %((str(int(time.time())))))
+        self.temperature = TEMPERATURE
 
-    def pairwise_similarity(self, z1, z2):
-        """
-        Compute the pairwise similarity between z1 and z2
-        Inputs:
-            z1, z2: space vectors
-        """
-        z = torch.cat((z1, z2), dim=0).to(self.device)
-        return torch.nn.CosineSimilarity(dim=2)(
-            z.unsqueeze(1), z.unsqueeze(0)).to(self.device)
+    def compute_loss_NT_Xent(self, z_i, z_j):
+        batch_size = z_i.shape[0]
+        assert batch_size == z_j.shape[0]
+        z = torch.cat([z_i, z_j], dim=0)
+        # cosine similarity on all different pairs in z
+        sim_matrix = torch.exp(nn.CosineSimilarity(dim=2)(
+            z.unsqueeze(1), z.unsqueeze(0)) / self.temperature)
 
-    def compute_loss(self, z1, z2):
-        """
-        Compute the loss using the pairwise similarity
-        Inputs:
-            z1, z2: space vectors
-        Return
-            the computed loss function
-        """
-        pairwise_sim = self.pairwise_similarity(z1, z2)
-        pos_pair = torch.exp((pairwise_sim) / TEMPERATURE).to(self.device)
-        return torch.mean(
-            -torch.log((pos_pair)/torch.sum(pos_pair))).to(self.device)
+        # remove all cosine similarity between same augmented images
+        mask = (torch.ones_like(sim_matrix) - torch.eye(
+            2 * batch_size, device=sim_matrix.device)).bool()
+        sim_matrix = sim_matrix.masked_select(mask).view(
+            2 * batch_size, -1)
+
+        # cosine similarity on positive pair z_i and z_j
+        pos_sim = torch.exp(nn.CosineSimilarity(dim=1)(
+            z_i, z_j) / self.temperature)
+
+        # loss_i_j = loss_j_i concatenate cosine similarity for a positive pair
+        # z_i and z_j
+        pos_sim = torch.cat([pos_sim, pos_sim], dim=0)
+
+        # Final loss
+        loss = torch.mean(-torch.log(pos_sim / torch.sum(sim_matrix,dim=-1)))    
+        return loss
 
     def train(self, log_interval=10):
         """
@@ -73,9 +77,7 @@ class SimCLRFramework(object):
         #     weight_decay=self.weight_decay)
         optimizer = optim.Adam(
             self.simclr_network.parameters(),
-            lr=self.lr,
-            betas=[self.beta_1, self.beta_2],
-            weight_decay=self.weight_decay)
+            lr=self.lr)
         progress_bar = tqdm(
             total=NB_EPOCHS*len(self.dataset),
             desc="SIMCLR training",
@@ -85,8 +87,6 @@ class SimCLRFramework(object):
             self.simclr_network.train()
             print("num epoch: " + str(epoch) +  "/" + str(NB_EPOCHS))
             for batch_id, ((x1, x2), _) in enumerate(self.dataset):
-                optimizer.zero_grad()
-
                 # send to device
                 x1 = x1.to(self.device)
                 x2 = x2.to(self.device)
@@ -99,13 +99,13 @@ class SimCLRFramework(object):
                 z2 = z2.to(self.device)
 
                 # loss
-                loss_pos_pair = self.compute_loss(z1, z2)
-
-                loss_pos_pair.backward()
+                batch_loss = self.compute_loss_NT_Xent(z1, z2)
+                optimizer.zero_grad()
+                batch_loss.backward()
                 optimizer.step()
 
                 # Logs
-                loss = loss_pos_pair.item()
+                loss = batch_loss.item()
                 train_loss += loss
                 if batch_id % log_interval == 0:
                     self.writer.add_scalar(
