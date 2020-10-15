@@ -10,7 +10,6 @@ import torchvision.models as models
 
 # Custom libraries
 import data_augmentation
-import lars
 from simclr_network import SimCLRNetwork
 import tools
 
@@ -27,7 +26,8 @@ class SimCLRFramework(object):
         self.dataset = dataset
         self.batch_size = batch_size
         self.simclr_network = SimCLRNetwork().to(device)
-        self.lr = 1e-3
+        # self.lr = 1e-3
+        self.lr = 0.3 * self.batch_size/256
         self.beta_1 = 0.5
         self.beta_2 = 0.999
         self.weight_decay = 1e-6
