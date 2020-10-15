@@ -13,6 +13,7 @@ class SimCLRNetwork(nn.Module):
         Constructor class
         """
         super(SimCLRNetwork, self).__init__()
+        self.z_dim = z_dim
         # base encoder based on resnet50
         self.base_encoder = models.resnet50()
         nb_features = self.base_encoder.fc.in_features
@@ -21,8 +22,14 @@ class SimCLRNetwork(nn.Module):
         self.projection_head = nn.Sequential(
             nn.Linear(nb_features, nb_features),
             nn.ReLU(),
-            nn.Linear(nb_features, z_dim),
+            nn.Linear(nb_features, self.z_dim),
         )
+
+    def get_z_dim(self):
+        """
+        return the latent space dimension
+        """
+        return self.z_dim
 
     def get_base_encoder_model(self):
         """
@@ -53,3 +60,16 @@ class SimCLRNetwork(nn.Module):
         z2 = self.projection_head(h2)
         z2_normalized = F.normalize(z2, dim = 1)
         return z1_normalized, z2_normalized
+
+    def get_latent_space(self, x1):
+        """
+        Forward function on one image
+        Inputs:
+            x1: image
+        Returns:
+            z1: space vector of image x1
+        """
+        h1 = self.base_encoder(x1)
+        z1 = self.projection_head(h1)
+        z1_normalized = F.normalize(z1, dim = 1)
+        return z1_normalized

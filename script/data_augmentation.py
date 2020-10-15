@@ -11,32 +11,45 @@ PROB_BLUR = 0.5
 
 # Data augmentation functions
 
-def t_compose_simclr(input_size):
+def t_compose_simclr(output_size):
     """
     Compose all transformation needed for data augmentation
     inputs:
-        input_size: int, define the size of the input image.
+        output_size: int, define the size of the output image.
     Return:
         a transform compose
     """
     return transforms.Compose([
-        t_random_resized_crop(input_size),
+        t_random_resized_crop(output_size),
         t_color_distortion(),
         t_gaussian_blur(),
         transforms.ToTensor()
     ])
 
-def t_random_resized_crop(input_size):
+def t_compose_resize(output_size):
+    """
+    compose to resize an image
+    inputs:
+        output_size: int, define the size of the output image.
+    Return:
+        a transform compose
+    """
+    return transforms.Compose([
+        transforms.Resize(output_size),
+        transforms.ToTensor()
+    ])
+
+def t_random_resized_crop(output_size):
     """
     Random crop and resize an image
     Input:
-        input_size: int, size of the input image.
+        output_size: int, size of the output image.
     Return:
         a transform compose
     """
     return transforms.Compose([
         transforms.RandomResizedCrop(
-            size=input_size,
+            size=output_size,
             scale=(0.08, 1.0),
             ratio=(3.0/4.0, 4.0/3.0)),
         transforms.RandomHorizontalFlip(p=0.5)
@@ -97,8 +110,8 @@ class CreatePosPair():
     """
     Class for creating positive pair dataset
     """
-    def __init__(self, input_size):
-        self.compose_tranform = t_compose_simclr(input_size)
+    def __init__(self, output_size):
+        self.compose_tranform = t_compose_simclr(output_size)
 
     def __call__(self, x):
         return self.compose_tranform(x), self.compose_tranform(x)

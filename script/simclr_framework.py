@@ -12,10 +12,7 @@ import torchvision.models as models
 import data_augmentation
 import lars
 from simclr_network import SimCLRNetwork
-
-NB_EPOCHS = 100
-TEMPERATURE = 0.5
-MODEL_PATH = "../models/simclr_%s.pth"
+import tools
 
 class SimCLRFramework(object):
     """
@@ -35,11 +32,24 @@ class SimCLRFramework(object):
         self.beta_1 = 0.5
         self.beta_2 = 0.999
         self.weight_decay = 1e-6
+        self.temperature = tools.TEMPERATURE
+        self.writer = None
+
+    def init_logger(self):
+        """
+        initialize the tensorboard logger
+        """
         self.writer = SummaryWriter(
             "../logs/SIMCLR_%s" %((str(int(time.time())))))
-        self.temperature = TEMPERATURE
 
     def compute_loss_NT_Xent(self, z_i, z_j):
+        """
+        compute the NT Xent loss
+        Inputs:
+            z_i, z_j: latent space of two augmented images
+        Return:
+            loss
+        """
         batch_size = z_i.shape[0]
         assert batch_size == z_j.shape[0]
         z = torch.cat([z_i, z_j], dim=0)
@@ -75,17 +85,18 @@ class SimCLRFramework(object):
         #     self.simclr_network.parameters(),
         #     lr=self.lr,
         #     weight_decay=self.weight_decay)
+        self.init_logger()
         optimizer = optim.Adam(
             self.simclr_network.parameters(),
             lr=self.lr)
         progress_bar = tqdm(
-            total=NB_EPOCHS*len(self.dataset),
+            total=tools.NB_EPOCHS*len(self.dataset),
             desc="SIMCLR training",
             leave=False)
         total_loss, train_loss, total_num = 0.0, 0.0, 0.0
-        for epoch in range(NB_EPOCHS):
+        for epoch in range(tools.NB_EPOCHS):
             self.simclr_network.train()
-            print("num epoch: " + str(epoch) +  "/" + str(NB_EPOCHS))
+            print("num epoch: " + str(epoch) +  "/" + str(tools.NB_EPOCHS))
             for batch_id, ((x1, x2), _) in enumerate(self.dataset):
                 # send to device
                 x1 = x1.to(self.device)
@@ -114,7 +125,13 @@ class SimCLRFramework(object):
                         epoch * len(self.dataset) + batch_id)
                     train_loss = 0
                 progress_bar.update(1)
-        return self.simclr_network.get_base_encoder_model()
+        self.writer.close()
+
+    def test(self):
+        pass
+
+    def validation(self):
+        pass
 
     def save_model(self):
         """
@@ -122,4 +139,9 @@ class SimCLRFramework(object):
         """
         torch.save(
             self.simclr_network.state_dict(),
-            MODEL_PATH %(str(int(time.time()))))
+            tools.MODEL_PATH + "simclr_%s.pth" %(str(int(time.time()))))
+
+    def load_model(self, model_name):
+        simclr_state_dict = torch.load(
+            tools.MODEL_PATH + model_name)
+        self.simclr_network.load_state_dict(simclr_state_dict)
