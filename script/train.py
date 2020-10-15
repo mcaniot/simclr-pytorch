@@ -16,5 +16,5 @@ trainloader = torch.utils.data.DataLoader(
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 framework = SimCLRFramework(trainloader, tools.BATCH_SIZE, device)
-# framework.train()
+framework.train()
 

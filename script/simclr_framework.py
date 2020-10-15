@@ -27,7 +27,6 @@ class SimCLRFramework(object):
         self.dataset = dataset
         self.batch_size = batch_size
         self.simclr_network = SimCLRNetwork().to(device)
-        # self.lr = 0.3*self.batch_size/256
         self.lr = 1e-3
         self.beta_1 = 0.5
         self.beta_2 = 0.999
@@ -81,10 +80,6 @@ class SimCLRFramework(object):
         Inputs:
             log_interval: number of batch between logs
         """
-        # optimizer = lars.LARS(
-        #     self.simclr_network.parameters(),
-        #     lr=self.lr,
-        #     weight_decay=self.weight_decay)
         self.init_logger()
         optimizer = optim.Adam(
             self.simclr_network.parameters(),
@@ -102,6 +97,9 @@ class SimCLRFramework(object):
                 x1 = x1.to(self.device)
                 x2 = x2.to(self.device)
 
+                # zero the parameter gradients
+                optimizer.zero_grad()
+
                 # forward
                 z1, z2 = self.simclr_network.forward(x1, x2)
 
@@ -111,13 +109,11 @@ class SimCLRFramework(object):
 
                 # loss
                 batch_loss = self.compute_loss_NT_Xent(z1, z2)
-                optimizer.zero_grad()
                 batch_loss.backward()
                 optimizer.step()
 
                 # Logs
-                loss = batch_loss.item()
-                train_loss += loss
+                train_loss += batch_loss.item()
                 if batch_id % log_interval == 0:
                     self.writer.add_scalar(
                         'loss/training_loss_generator',
