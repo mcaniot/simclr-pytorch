@@ -26,8 +26,7 @@ class SimCLRFramework(object):
         self.dataset = dataset
         self.batch_size = batch_size
         self.simclr_network = SimCLRNetwork().to(device)
-        # self.lr = 1e-3
-        self.lr = 0.3 * self.batch_size/256
+        self.lr = 1e-3
         self.beta_1 = 0.5
         self.beta_2 = 0.999
         self.weight_decay = 1e-6
@@ -88,7 +87,8 @@ class SimCLRFramework(object):
             total=tools.NB_EPOCHS*len(self.dataset),
             desc="SIMCLR training",
             leave=False)
-        total_loss, train_loss, total_num = 0.0, 0.0, 0.0
+        train_loss = 0.0
+        iter_interval = 0
         for epoch in range(tools.NB_EPOCHS):
             self.simclr_network.train()
             print("num epoch: " + str(epoch) +  "/" + str(tools.NB_EPOCHS))
@@ -114,10 +114,11 @@ class SimCLRFramework(object):
 
                 # Logs
                 train_loss += batch_loss.item()
-                if batch_id % log_interval == 0:
+                iter_interval += 1
+                if iter_interval % log_interval == 0:
                     self.writer.add_scalar(
                         'loss/training_loss_generator',
-                        train_loss / log_interval,
+                        float(train_loss / log_interval),
                         epoch * len(self.dataset) + batch_id)
                     train_loss = 0
                 progress_bar.update(1)
